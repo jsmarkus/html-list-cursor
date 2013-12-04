@@ -1,0 +1,6 @@
+#cursor-container {
+    width: 300px;
+    height: 500px;
+    outline: 1px solid black;
+    overflow-y: scroll;
+}
