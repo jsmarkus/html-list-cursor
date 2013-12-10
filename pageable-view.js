@@ -1,6 +1,6 @@
 /*exported PageableView*/
 /*global _, jQuery, async*/
-/*jshint maxcomplexity: 5*/
+/*jshint maxcomplexity: 3*/
 
 var PageableView = (function(_, $, async) {
     var S_IDLE = 'S_IDLE';
