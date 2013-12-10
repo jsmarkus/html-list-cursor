@@ -1,12 +1,17 @@
-var PageableView = (function() {
+/*exported PageableView*/
+/*global _, jQuery, async*/
+/*jshint maxcomplexity: 5*/
+
+var PageableView = (function(_, $, async) {
     var S_IDLE = 'S_IDLE';
     var S_LOADING = 'S_LOADING';
     var S_SCROLLING = 'S_SCROLLING';
 
-    var TIMEOUT_SCROLL = 1000;
+    var TIMEOUT_SCROLL = 400;
 
 
     function PageableView(options) {
+        this._onLog = options.log;
         this._onRead = options.read;
         this._container = $(options.container);
         this._pageSize = options.pageSize;
@@ -24,16 +29,19 @@ var PageableView = (function() {
         var pagesToLoad = this._getPagesToLoad(pIndex);
         var pagesToUnload = this._getPagesToUnload(pIndex);
 
-        console.log('index, pIndex:', index, pIndex);
-        console.log('pagesToLoad:', pagesToLoad);
-        console.log('pagesToUnload:', pagesToUnload);
+        this._log('index, pIndex:', index, pIndex);
+        this._log('pagesToLoad:', pagesToLoad);
+        this._log('pagesToUnload:', pagesToUnload);
 
         this._setState(S_LOADING);
+
+        this._unloadPages(pagesToUnload);
+
         this._loadPages(pagesToLoad, _.bind(function() {
             for (var i = 0; i < pagesToLoad.length; i++) {
                 var pI = pagesToLoad[i];
                 var $pg = this._renderPage(pI);
-                console.log($pg);
+                this._log($pg);
                 this._domInsertPage(pI, $pg);
             }
             this._domScrollTo(pIndex, index);
@@ -42,18 +50,18 @@ var PageableView = (function() {
     };
 
     proto._setState = function(state) {
-        console.log('STATE:', this._state, '->', state);
+        this._log('STATE:', this._state, '->', state);
         this._state = state;
     };
 
     proto._bind = function() {
-        var comeBackIdle = _.bind(function () {
+        var comeBackIdle = _.bind(function() {
             this._setState(S_IDLE);
             this._onScrollEnd();
         }, this);
         var comeBackTimeout;
 
-        this._container.on('scroll', _.bind(function(event) {
+        this._container.on('scroll', _.bind(function() {
             if (this._state === S_IDLE) {
                 this._setState(S_SCROLLING);
                 comeBackTimeout = setTimeout(comeBackIdle, TIMEOUT_SCROLL);
@@ -68,7 +76,7 @@ var PageableView = (function() {
 
     proto._onScrollEnd = function() {
         var coords = this._domGetCurrentItemCoordinates();
-        console.log('scrolled to:', coords);
+        this._log('scrolled to:', coords);
         this.seek(coords[0]);
     };
 
@@ -80,12 +88,25 @@ var PageableView = (function() {
         }, cb);
     };
 
+    proto._unloadPages = function(pIndices) {
+        for (var i = 0; i < pIndices.length; i++) {
+            var pI = pIndices[i];
+            this._domRemovePage(pI);
+            this._unsetPage(pI);
+        }
+    };
+
     proto._getPagesToUnload = function(seekPIndex) {
         var pIndices = this._getPageIndices();
-        return _.reject(pIndices, function(loadedPIndex) {
-            loadedPIndex = 1 * loadedPIndex;
-            return (loadedPIndex < seekPIndex - 1) || (loadedPIndex > seekPIndex + 1);
-        });
+        return (_.chain(pIndices)
+            .reject(function(loadedPIndex) {
+                loadedPIndex = 1 * loadedPIndex;
+                return (loadedPIndex >= seekPIndex - 1) && (loadedPIndex <= seekPIndex + 1);
+            })
+            .map(function(i) {
+                return 1 * i;
+            })
+            .value());
     };
 
     proto._getPagesToLoad = function(seekPIndex) {
@@ -156,18 +177,24 @@ var PageableView = (function() {
         var startItemIndex = this._pageSize * pIndex;
         for (var i = 0; i < items.length; i++) {
             var itemIndex = startItemIndex + i;
-            var $item = $('<div>').attr({
-                'class': 'item',
-                'index': itemIndex
-            });
+            var $item = $('<div>')
+                .attr({
+                    'class': 'item',
+                    'index': itemIndex
+                })
+                .css({
+                    padding: 1
+                });
             $item.html(items[i]);
             $item.appendTo($pg);
         }
         return $pg;
     };
 
-    proto._domRemovePage = function() {
-
+    proto._domRemovePage = function(pIndex) {
+        var $pg = this._domPages[pIndex];
+        $pg.remove();
+        delete this._domPages[pIndex];
     };
 
     proto._domInsertPage = function(pIndex, dom) {
@@ -210,20 +237,20 @@ var PageableView = (function() {
 
     proto._domGetCurrentItemCoordinates = function() {
         var containerPos = this._container.offset();
-        var firstNode = document.elementFromPoint(containerPos.left, containerPos.top);
+        var firstNode = document.elementFromPoint(containerPos.left + 1, containerPos.top + 1);
         firstNode = $(firstNode).closest('.item');
-        if(!firstNode) {
+        if (!firstNode) {
             return false;
         }
         var index = 1 * firstNode.attr('index');
         return [index];
     };
 
-    proto.__ = function() {};
-    proto.__ = function() {};
-    proto.__ = function() {};
-    proto.__ = function() {};
-    proto.__ = function() {};
+    proto._log = function() {
+        if(this._onLog) {
+            this._onLog.apply(this, arguments);
+        }
+    };
 
     return PageableView;
-}());
+}(_, jQuery, async));
